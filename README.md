@@ -40,14 +40,29 @@ taskforge -C ~/proj 'cmd1' 'cmd2'
 
 ## Библиотека
 
+Массив строк (+ опциональная директория, по умолчанию Dir.pwd):
+
 ```ruby
 require "taskforge"
 
-jobs = ["rake build:web", "rake build:api"].map do |cmd|
-  Taskforge::Pool::Job.new(cmd, cmd)   # name, command
-end
-Taskforge::Pool.new(Dir.pwd, jobs).run # кидает Taskforge::Pool::Error
+Taskforge.run ["rake build:web", "rake build:api"]
+Taskforge.run ["rake build:web"], "path/to/proj"
 ```
+
+Или DSL-блок — директория передаётся первым аргументом:
+
+```ruby
+Taskforge.run do
+  job "rake build:web"
+  job "rake build:api"
+end
+
+Taskforge.run "path/to/proj" do
+  job "crystal build --release src/cli.cr -o bin/cli"
+end
+```
+
+Провал задач (после ретрая) кидает `Taskforge::Pool::Error`.
 
 ## Интеграция в Rakefile (любой проект)
 
@@ -55,8 +70,9 @@ Taskforge::Pool.new(Dir.pwd, jobs).run # кидает Taskforge::Pool::Error
 require "taskforge/rake_task"
 
 Taskforge::RakeTask.new(:build_all) do |t|
-  t.description = "Build every binary in parallel"
-  t.commands = ["rake build:web", "rake build:api", "rake build:cli"]
+  t.job "rake build:web"
+  t.job "rake build:api"
+  t.job "rake build:cli"
 end
 ```
 

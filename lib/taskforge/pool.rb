@@ -46,14 +46,12 @@ module Taskforge
     # 8 воркеров (она и так выполняется секунды — ширина не важна).
     MIN_PEAK_KB = 262_144
 
-    # name — человекочитаемое имя для сообщений об ошибках, command —
-    # shell-строка (запускается как subprocess: sh -c command).
-    Job = Struct.new(:name, :command)
-
-    def initialize(dir, jobs, cache_root: nil)
-      @dir = dir
-      @jobs = jobs
-      @cache_root = cache_root || File.join(dir, ".taskforge", "cache")
+    # Задачи — массив shell-строк, каждая запускается как subprocess
+    # (sh -c command). Имя задачи для сообщений = сама команда.
+    def initialize(dir, commands, cache_root: nil)
+      @dir = File.expand_path(dir)
+      @jobs = commands
+      @cache_root = cache_root || File.join(@dir, ".taskforge", "cache")
       @peak_kb = FALLBACK_PEAK_KB
       FileUtils.mkdir_p(@cache_root)
     end
@@ -65,14 +63,14 @@ module Taskforge
       workers = (forced || initial_workers).clamp(1, @jobs.size)
       if workers == 1 || @jobs.size == 1
         @jobs.each do |job|
-          raise Error, "task failed: #{job.name}" unless run_one(job, 0)
+          raise Error, "task failed: #{job}" unless run_one(job, 0)
         end
         return
       end
       warm = @jobs.first
       unless warm_up(warm)
         # не исключён OOM при стартовой оценке — один последовательный ретрай
-        raise Error, "task failed: #{warm.name}" unless run_one(warm, 0)
+        raise Error, "task failed: #{warm}" unless run_one(warm, 0)
       end
       workers = (forced || workers_for(@peak_kb)).clamp(1, @jobs.size)
       clone_warm_cache(workers)
@@ -80,7 +78,7 @@ module Taskforge
       failures = run_pool(@jobs[1..], workers)
       # ретрай по одному: падение в пуле могло быть разовым перекосом памяти
       still = failures.reject { |job| run_one(job, 0) }
-      raise Error, "task failed: #{still.map(&:name).sort.join(', ')}" unless still.empty?
+      raise Error, "task failed: #{still.sort.join(', ')}" unless still.empty?
     end
 
     # Запуск shell-команды с env-переопределениями (CRYSTAL_CACHE_DIR) —
@@ -116,8 +114,8 @@ module Taskforge
     # (250 мс интервал). Замеренный peak становится знаменателем формулы
     # ширины и порогом гейта.
     private def warm_up(job)
-      pid = Process.spawn(env_for(0), job.command, chdir: @dir,
-                                                     out: $stdout, err: $stderr)
+      pid = Process.spawn(env_for(0), job, chdir: @dir,
+                                          out: $stdout, err: $stderr)
       peak_kb = 0
       status = nil
       loop do
@@ -136,7 +134,7 @@ module Taskforge
       end
       @peak_kb = peak_kb < MIN_PEAK_KB ? MIN_PEAK_KB : peak_kb
       puts self.class.paint(
-        "Warm-up: #{job.name} done, peak task RSS #{@peak_kb / 1024} MB", :blue
+        "Warm-up: #{job} done, peak task RSS #{@peak_kb / 1024} MB", :blue
       )
       status.success?
     rescue SystemCallError => e
@@ -187,7 +185,7 @@ module Taskforge
     end
 
     private def run_one(job, cache_index)
-      self.class.spawn_process(job.command, @dir, env_for(cache_index))
+      self.class.spawn_process(job, @dir, env_for(cache_index))
     end
 
     private def env_for(cache_index)

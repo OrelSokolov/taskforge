@@ -6,28 +6,52 @@ require "taskforge"
 RSpec.describe Taskforge::Pool do
   let(:cache) { File.join(Dir.tmpdir, "taskforge-spec-cache") }
 
-  it "runs commands as subprocesses" do
+  it "runs a plain array of command strings" do
     Dir.mktmpdir do |dir|
-      jobs = 3.times.map { |i| described_class::Job.new("touch-#{i}", "touch out-#{i}") }
-      described_class.new(dir, jobs, cache_root: cache).run
+      commands = 3.times.map { |i| "touch out-#{i}" }
+      described_class.new(dir, commands, cache_root: cache).run
       3.times { |i| expect(File.exist?(File.join(dir, "out-#{i}"))).to be(true) }
     end
   end
 
   it "raises when a command keeps failing after the retry" do
-    jobs = [described_class::Job.new("ok", "true"), described_class::Job.new("bad", "false")]
-    pool = described_class.new(Dir.pwd, jobs, cache_root: cache)
-    expect { pool.run }.to raise_error(described_class::Error, /bad/)
+    pool = described_class.new(Dir.pwd, ["true", "false"], cache_root: cache)
+    expect { pool.run }.to raise_error(described_class::Error, /false/)
   end
 
   it "runs sequentially with TASKFORGE_JOBS=1" do
     Dir.mktmpdir do |dir|
       ENV["TASKFORGE_JOBS"] = "1"
-      jobs = 2.times.map { |i| described_class::Job.new("seq-#{i}", "touch s-#{i}") }
-      described_class.new(dir, jobs, cache_root: cache).run
-      2.times { |i| expect(File.exist?(File.join(dir, "s-#{i}"))).to be(true) }
+      described_class.new(dir, ["touch s-0", "touch s-1"], cache_root: cache).run
+      expect(File.exist?(File.join(dir, "s-1"))).to be(true)
     end
   ensure
     ENV.delete("TASKFORGE_JOBS")
+  end
+end
+
+RSpec.describe Taskforge do
+  it "runs an array of commands in the given directory" do
+    Dir.mktmpdir do |dir|
+      described_class.run(["touch a", "touch b"], dir)
+      expect(File.exist?(File.join(dir, "b"))).to be(true)
+    end
+  end
+
+  it "runs a single command string" do
+    Dir.mktmpdir do |dir|
+      described_class.run("touch solo", dir)
+      expect(File.exist?(File.join(dir, "solo"))).to be(true)
+    end
+  end
+
+  it "runs the DSL block, with an optional directory" do
+    Dir.mktmpdir do |dir|
+      described_class.run(dir) do
+        job "touch dsl-1"
+        job "touch dsl-2"
+      end
+      2.times { |i| expect(File.exist?(File.join(dir, "dsl-#{i + 1}"))).to be(true) }
+    end
   end
 end

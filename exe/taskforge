@@ -20,9 +20,8 @@ commands = parser.parse!(ARGV)
 abort parser.to_s if commands.empty?
 
 ENV["TASKFORGE_JOBS"] = forced.to_s if forced
-jobs = commands.map { |cmd| Taskforge::Pool::Job.new(cmd, cmd) }
 begin
-  Taskforge::Pool.new(dir, jobs).run
+  Taskforge.run(commands, dir)
 rescue Taskforge::Pool::Error => e
   abort "taskforge: #{e.message}"
 end
