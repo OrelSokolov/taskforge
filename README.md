@@ -65,10 +65,12 @@ end
 
 ## Установка
 
-В Gemfile:
+Гемы публикуются только на GitHub (не на RubyGems), поэтому в Gemfile —
+git-источники:
 
 ```ruby
-gem "taskforge"
+gem "sysmonitor", git: "https://github.com/OrelSokolov/sysmonitor.git"
+gem "taskforge",  git: "https://github.com/OrelSokolov/taskforge.git"
 ```
 
 ## Разработка

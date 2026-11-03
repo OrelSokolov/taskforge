@@ -3,6 +3,6 @@
 source "https://rubygems.org"
 
 gemspec
-# Пока sysmonitor не опубликован на RubyGems — подтягиваем из git.
-# После публикации строку ниже можно удалить (gemspec уже зависит от "~> 0.1").
+# Распространение — только GitHub (на RubyGems не публикуем), поэтому
+# зависимость sysmonitor тянем напрямую из git.
 gem "sysmonitor", git: "https://github.com/OrelSokolov/sysmonitor.git"
