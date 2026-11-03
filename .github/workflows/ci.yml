@@ -1,0 +1,13 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - run: bundle install
+      - run: bundle exec rspec --format documentation
+      - run: bundle exec exe/taskforge -j 2 'echo forge' 'echo works' 2>/dev/null | grep -qx forge

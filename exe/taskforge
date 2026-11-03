@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# taskforge — запуск тяжёлых команд параллельно, ширина пула адаптивна
+# (ядра + свободная RAM + замер peak RSS первой задачи).
+#
+#   taskforge 'rake build:web' 'rake build:api' 'crystal build --release src/x.cr'
+
+require "optparse"
+require "taskforge"
+
+dir = Dir.pwd
+forced = nil
+parser = OptionParser.new do |o|
+  o.banner = "Usage: taskforge [options] 'command 1' 'command 2' ..."
+  o.on("-j N", Integer, "force worker count (default: adaptive, from cores and RAM)") { |n| forced = n }
+  o.on("-C DIR", "working directory for the commands (default: cwd)") { |d| dir = d }
+end
+commands = parser.parse!(ARGV)
+abort parser.to_s if commands.empty?
+
+ENV["TASKFORGE_JOBS"] = forced.to_s if forced
+jobs = commands.map { |cmd| Taskforge::Pool::Job.new(cmd, cmd) }
+begin
+  Taskforge::Pool.new(dir, jobs).run
+rescue Taskforge::Pool::Error => e
+  abort "taskforge: #{e.message}"
+end
